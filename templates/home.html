@@ -42,6 +42,9 @@
                     <input type="text" name="message" id="message" class="form-control" autocomplete="off">
                 </div>
 
+                    <input type="hidden" name="action" id="action" >
+                
+
                 <hr>
 
                 <div id="output" class="chatbox"></div>
@@ -62,11 +65,27 @@
 <script>
     let socket = null;
     document.addEventListener("DOMContentLoaded", function () {
-        socket = new WebSocket("ws://localhost:8083/ws");
+        socket = new WebSocket("ws://localhost:8080/ws");
 
         socket.onopen = () => {
             console.log("connected!!");
         };
+
+        socket.onclose = () => {
+            console.log("connection closed!")
+        }
+
+        socket.onerror = error => {
+            console.log("there was an error")
+        }
+
+        socket.onmessage = msg => {
+            console.log("message received")
+            console.log(msg)
+            let j = JSON.parse(msg.data);
+            console.log(j);
+
+        }
     });
 </script>
 
