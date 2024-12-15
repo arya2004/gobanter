@@ -52,6 +52,7 @@
             </div>
             <div class="col-md-4">
                 Whose online
+                <ul id="online_users"></ul>
             </div>
         </div>
     </div>
@@ -64,6 +65,15 @@
     crossorigin="anonymous"></script>
 <script>
     let socket = null;
+
+    window.onbeforeunload = function(){
+        console.log("leaving ;(");
+        let jsonData = {}
+        jsonData["action"] = "left"
+        socket.send(JSON.stringify(jsonData))
+        
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         socket = new WebSocket("ws://localhost:8080/ws");
 
@@ -80,12 +90,35 @@
         }
 
         socket.onmessage = msg => {
-            console.log("message received")
-            console.log(msg)
+            let message = JSON.parse(msg.data)
+            console.log(message)
             let j = JSON.parse(msg.data);
-            console.log(j);
+            let data = JSON.parse(msg.data)
+            console.log("Action:", data.action)
+
+            switch (data.action){
+                case "list_users":
+                    let ul = document.getElementById("online_users")
+                    while(ul.firstChild) ul.removeChild(ul.firstChild)
+                    if(data.connected_users.length > 0){
+                        data.connected_users.forEach(function(item){
+                            let li = document.createElement("li")
+                            li.appendChild(document.createTextNode(item))
+                            ul.appendChild(li)
+                        })
+                    }
+                    break;
+            }
 
         }
+        let userInput = document.getElementById("username")
+        userInput.addEventListener("change", function() {
+            let jsonData = {}
+            jsonData["action"] = "username"
+            jsonData["username"] = this.value
+            console.log(jsonData)
+            socket.send(JSON.stringify(jsonData))
+        })
     });
 </script>
 
