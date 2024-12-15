@@ -8,14 +8,18 @@ import (
 	"github.com/arya2004/gobanter/pkg/routes"
 )
 
-func main(){
+// main is the entry point of the application
+func main() {
+	// Initialize the application routes
 	mux := routes.Routes()
 
-	log.Println("starting channel listener")
+	// Start a goroutine to listen for WebSocket messages
+	log.Println("Starting WebSocket channel listener...")
 	go handlers.ListenToWsChannel()
 
-	log.Println("starting on port 8080")
-
-	_ = http.ListenAndServe(":8080", mux)
-
+	// Start the HTTP server on port 8080
+	log.Println("Server starting on port 8080...")
+	if err := http.ListenAndServe(":8080", mux); err != nil {
+		log.Fatalf("Error starting server: %v", err)
+	}
 }
