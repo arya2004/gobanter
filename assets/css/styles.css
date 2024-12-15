@@ -1,0 +1,26 @@
+.chatbox {
+    border: 1px solid #ddd;
+    border-radius: 0.5rem;
+    min-height: 200px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 1em;
+    background-color: #f8f9fa;
+}
+
+.chat-header {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+#online_users {
+    list-style: none;
+    padding: 0;
+}
+
+#online_users li {
+    background: #e9ecef;
+    margin-bottom: 0.5em;
+    padding: 0.5em;
+    border-radius: 0.5rem;
+}
