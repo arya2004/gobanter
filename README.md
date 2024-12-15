@@ -1,63 +1,73 @@
 
-# GoBanter 💬  
-GoBanter is a lightweight, real-time chat application built in Go using WebSocket. It's designed to provide seamless communication with a simple and efficient setup.
+# GoBanter 💬
 
-## Features  
-- 🔗 Real-time messaging using WebSockets.  
-- 🖥️ Minimal setup and easy to run.  
-- 🚀 Scalable and lightweight design for learning and production.  
+GoBanter is a lightweight, real-time chat application built in Go. It uses Gorilla WebSocket for seamless real-time communication, Pat URL pattern muxer for routing, and jQuery for simple front-end interactions. Perfect for learning or deploying a scalable chat system with minimal overhead.
 
 ---
 
-## Getting Started  
-
-### Prerequisites  
-- [Golang](https://golang.org/dl/) (Go 1.16 or higher) installed on your machine.  
+## Features
+- **Real-time Messaging**: Powered by WebSockets for instant communication.
+- **Simple & Lightweight**: Easy to set up and run with minimal dependencies.
+- **Cross-Device Support**: Accessible from multiple devices simultaneously.
+- **Customizable**: A great foundation to build your chat application.
 
 ---
 
-### Installation  
+## Getting Started
 
-1. **Clone the repository**:  
+### Prerequisites
+- [Go](https://golang.org/dl/) (1.16 or higher)
+- Basic understanding of WebSockets and Go development (helpful but not required).
+
+---
+
+### Installation
+
+1. **Clone the repository**:
    ```bash
-   git clone https://github.com/arya2004/GoBanter.git
-   cd GoBanter
+   git clone https://github.com/arya2004/gobanter.git
+   cd gobanter
    ```
 
-2. **Navigate to the entry point**:  
+2. **Install dependencies**:
    ```bash
-   cd cmd/web
+   go  mod tidy
    ```
 
-3. **Run the application**:  
+3. **Run the application**:
    ```bash
-   go run main.go
+   sh run.sh
    ```
 
-4. **Access the chat application**:  
-   Open your browser and navigate to `http://localhost:8083`.  
-
-
+4. **Access the application**:
+   Open your browser and navigate to `http://localhost:8080`.
 
 ---
 
-## Usage  
-1. Open the application in multiple browser tabs or devices at `http://localhost:8083`.  
-2. Start sending messages! All users connected to the server will see messages in real-time.  
+## Usage
+
+1. Open the application in multiple tabs or devices.
+2. Start typing messages in the chat interface.
+3. Messages will appear in real-time across all connected users.
 
 ---
 
-## Contributing  
-Contributions are welcome! Feel free to open an issue or submit a pull request for improvements.  
+
+## Contributing
+
+We welcome contributions! Whether it's a bug fix, feature addition, or documentation improvement, feel free to open an issue or submit a pull request.
+
+### Steps to Contribute:
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature-name`).
+3. Commit your changes (`git commit -m "Add new feature"`).
+4. Push to your fork (`git push origin feature-name`).
+5. Open a pull request.
 
 ---
 
-## License  
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.  
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
-
-## Acknowledgments  
-- Built with [Gin Web Framework](https://gin-gonic.com/).  
-- Powered by WebSocket for real-time communication.  
-
