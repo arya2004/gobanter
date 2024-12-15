@@ -13,6 +13,9 @@ func Routes() http.Handler {
 	mux.Get("/", http.HandlerFunc(handlers.Home))
 	mux.Get("/ws", http.HandlerFunc(handlers.WsEndpoint))
 
+	fileServer := http.FileServer(http.Dir("./assets/"))
+	mux.Get("/assets/", http.StripPrefix("/assets/", fileServer))
+
 	return mux
 
 }
