@@ -24,3 +24,62 @@
     padding: 0.5em;
     border-radius: 0.5rem;
 }
+
+.private-message {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-left: 4px solid #5a67d8;
+    padding: 12px 15px;
+    margin: 8px 0;
+    border-radius: 8px;
+    color: white;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+
+.private-label {
+    font-weight: bold;
+    font-size: 0.9em;
+    display: block;
+    margin-bottom: 5px;
+    opacity: 0.9;
+}
+
+.message-text {
+    font-size: 1em;
+    display: block;
+}
+
+.public-message {
+    background-color: #f7fafc;
+    border-left: 4px solid #4299e1;
+    padding: 12px 15px;
+    margin: 8px 0;
+    border-radius: 8px;
+    color: #2d3748;
+}
+
+
+.error-message {
+    background-color: #fff5f5;
+    border-left: 4px solid #fc8181;
+    padding: 12px 15px;
+    margin: 8px 0;
+    border-radius: 8px;
+    color: #c53030;
+}
+
+#recipient-select {
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 14px;
+    background-color: white;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+#recipient-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
