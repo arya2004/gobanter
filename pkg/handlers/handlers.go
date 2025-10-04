@@ -12,16 +12,16 @@ import (
 
 // Global variables for managing WebSocket connections
 var (
-	wsChannel       = make(chan WsPayload)                // Channel for handling WebSocket messages
-	clients         = make(map[*websocket.Conn]string)   // Map of connected clients and their usernames
-	views           = jet.NewSet(                        // Template engine configuration
+	wsChannel = make(chan WsPayload)             // Channel for handling WebSocket messages
+	clients   = make(map[*websocket.Conn]string) // Map of connected clients and their usernames
+	views     = jet.NewSet(                      // Template engine configuration
 		jet.NewOSFileSystemLoader("./templates"),
 		jet.InDevelopmentMode(),
 	)
 	upgradeConnection = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
-		CheckOrigin: func(r *http.Request) bool { return true }, // Allow all origins
+		CheckOrigin:     func(r *http.Request) bool { return true }, // Allow all origins
 	}
 )
 
@@ -35,18 +35,23 @@ func Home(w http.ResponseWriter, r *http.Request) {
 }
 
 // WsJsonResponse represents the JSON structure for WebSocket responses
+// added "from" and "to" for private messages
 type WsJsonResponse struct {
 	Action         string   `json:"action"`
 	Message        string   `json:"message"`
 	MessageType    string   `json:"message_type"`
 	ConnectedUsers []string `json:"connected_users"`
+	From           string   `json:"from"`
+	To             string   `json:"to"`
 }
 
 // WsPayload represents the payload received from WebSocket clients
+// added "to" for private messages
 type WsPayload struct {
 	Action   string          `json:"action"`
 	Username string          `json:"username"`
 	Message  string          `json:"message"`
+	To       string          `json:"to"`
 	Conn     *websocket.Conn `json:"-"` // Exclude from JSON serialization
 }
 
@@ -105,7 +110,64 @@ func ListenToWsChannel() {
 			response.Action = "broadcast"
 			response.Message = fmt.Sprintf("<strong>%s</strong>: %s", e.Username, e.Message)
 			broadcastToAll(response)
+
+		case "private":
+			// handle private messages
+			handlePrivateMessage(e)
 		}
+	}
+}
+
+//function handlePrivateMessage sends a message to a specific user
+
+func handlePrivateMessage(payload WsPayload) {
+
+	// finding the recipient connection
+	var recipientConn *websocket.Conn
+	for conn, username := range clients {
+		if username == payload.To {
+			recipientConn = conn
+			break
+		}
+	}
+
+	// if recipient not found , then send an error message to sender
+
+	if recipientConn == nil {
+		errorResponse := WsJsonResponse{
+			Action:      "error",
+			Message:     fmt.Sprintf("User '%s' not found or offline", payload.To),
+			MessageType: "error",
+		}
+
+		if err := payload.Conn.WriteJSON(errorResponse); err != nil {
+			log.Printf("Error sending error message to sender: %v", err)
+		}
+		return
+	}
+
+	// creating a private message response
+
+	response := WsJsonResponse{
+		Action:      "private",
+		Message:     payload.Message,
+		MessageType: "private",
+		From:        payload.Username,
+		To:          payload.To,
+	}
+
+	// this is send to recipient
+
+	if err := recipientConn.WriteJSON(response); err != nil {
+		log.Printf("Error sending private message to recipient: %v", err)
+	} else {
+		log.Printf("Private message sent from %s to %s", payload.Username, payload.To)
+	}
+
+	// echo back to the sender (for confirmation on the Ui side)
+
+	if err := payload.Conn.WriteJSON(response); err != nil {
+		log.Printf("Error sending confirmation to sender: %v", err)
 	}
 }
 
