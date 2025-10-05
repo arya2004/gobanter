@@ -31,6 +31,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	err := renderPage(w, "home.html", nil)
 	if err != nil {
 		log.Println("Error rendering home page:", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
 
