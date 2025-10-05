@@ -83,3 +83,14 @@
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
+
+.timestamp {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-left: 5px;
+  }
+  
+.message-item {
+    margin-bottom: 10px;
+  }
+  
