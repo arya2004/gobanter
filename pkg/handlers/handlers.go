@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"time"
 
 	"github.com/CloudyKit/jet/v6"
 	"github.com/gorilla/websocket"
@@ -43,6 +44,7 @@ type WsJsonResponse struct {
 	ConnectedUsers []string `json:"connected_users"`
 	From           string   `json:"from"`
 	To             string   `json:"to"`
+	TimeStamp      string   `json:"timestamp"` // added timestamp field
 }
 
 // WsPayload represents the payload received from WebSocket clients
@@ -69,7 +71,8 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	// Initial connection response
 	response := WsJsonResponse{
-		Message: "<em><small>Connected to server</small></em>",
+		Message:   "<em><small>Connected to server</small></em>",
+		TimeStamp: time.Now().Format("15:07"), // added timestamp on the connection message
 	}
 
 	clients[ws] = "" // Add the new connection to clients map
@@ -109,6 +112,7 @@ func ListenToWsChannel() {
 			// Handle broadcast messages
 			response.Action = "broadcast"
 			response.Message = fmt.Sprintf("<strong>%s</strong>: %s", e.Username, e.Message)
+			response.TimeStamp = time.Now().Format("15:07") // added timestamp for broadcasting message
 			broadcastToAll(response)
 
 		case "private":
@@ -132,12 +136,14 @@ func handlePrivateMessage(payload WsPayload) {
 	}
 
 	// if recipient not found , then send an error message to sender
+	// timestamp for sending error messages as well
 
 	if recipientConn == nil {
 		errorResponse := WsJsonResponse{
 			Action:      "error",
 			Message:     fmt.Sprintf("User '%s' not found or offline", payload.To),
 			MessageType: "error",
+			TimeStamp:   time.Now().Format("15:07"),
 		}
 
 		if err := payload.Conn.WriteJSON(errorResponse); err != nil {
@@ -154,6 +160,7 @@ func handlePrivateMessage(payload WsPayload) {
 		MessageType: "private",
 		From:        payload.Username,
 		To:          payload.To,
+		TimeStamp:   time.Now().Format("15:07"), // timestamp for private message as well
 	}
 
 	// this is send to recipient
