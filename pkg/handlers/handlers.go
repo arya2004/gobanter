@@ -11,33 +11,44 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Global variables for managing WebSocket connections
+// Hub encapsulates all WebSocket related global state
+type Hub struct {
+	Clients map[*websocket.Conn]string
+	Channel chan WsPayload
+}
+
+// Create a single hub instance
+
+var hub = Hub{
+	Clients: make(map[*websocket.Conn]string),
+	Channel: make(chan WsPayload),
+}
+
+// template engine and WebSocket upgrader
+
 var (
-	wsChannel = make(chan WsPayload)             // Channel for handling WebSocket messages
-	clients   = make(map[*websocket.Conn]string) // Map of connected clients and their usernames
-	views     = jet.NewSet(                      // Template engine configuration
+	views = jet.NewSet(
 		jet.NewOSFileSystemLoader("./templates"),
 		jet.InDevelopmentMode(),
 	)
 	upgradeConnection = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
-		CheckOrigin:     func(r *http.Request) bool { return true }, // Allow all origins
+		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
 )
 
 // Home renders the home page of the application
+
 func Home(w http.ResponseWriter, r *http.Request) {
 	log.Println("Rendering home page")
-	err := renderPage(w, "home.html", nil)
-	if err != nil {
+	if err := renderPage(w, "home.html", nil); err != nil {
 		log.Println("Error rendering home page:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
 
 // WsJsonResponse represents the JSON structure for WebSocket responses
-// added "from" and "to" for private messages
 type WsJsonResponse struct {
 	Action         string   `json:"action"`
 	Message        string   `json:"message"`
@@ -45,20 +56,20 @@ type WsJsonResponse struct {
 	ConnectedUsers []string `json:"connected_users"`
 	From           string   `json:"from"`
 	To             string   `json:"to"`
-	TimeStamp      string   `json:"timestamp"` // added timestamp field
+	TimeStamp      string   `json:"timestamp"`
 }
 
 // WsPayload represents the payload received from WebSocket clients
-// added "to" for private messages
 type WsPayload struct {
 	Action   string          `json:"action"`
 	Username string          `json:"username"`
 	Message  string          `json:"message"`
 	To       string          `json:"to"`
-	Conn     *websocket.Conn `json:"-"` // Exclude from JSON serialization
+	Conn     *websocket.Conn `json:"-"`
 }
 
 // WsEndpoint upgrades HTTP connections to WebSocket and initializes communication
+
 func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 	log.Println("Client attempting to connect to WebSocket endpoint")
 
@@ -70,74 +81,62 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Client successfully connected to WebSocket endpoint")
 
-	// Initial connection response
 	response := WsJsonResponse{
 		Message:   "<em><small>Connected to server</small></em>",
-		TimeStamp: time.Now().Format("15:07"), // added timestamp on the connection message
+		TimeStamp: time.Now().Format("15:07"),
 	}
 
-	clients[ws] = "" // Add the new connection to clients map
+	hub.Clients[ws] = "" // Add connection to Hub
 
-	err = ws.WriteJSON(response)
-	if err != nil {
+	if err := ws.WriteJSON(response); err != nil {
 		log.Println("Error writing JSON response:", err)
 		return
 	}
 
-	// Start listening for messages from this client
 	go ListenForWs(ws)
 }
 
-// ListenToWsChannel listens for messages on the WebSocket channel and handles them
+// ListenToWsChannel listens for messages on the Hub channel
+
 func ListenToWsChannel() {
 	for {
-		e := <-wsChannel
+		e := <-hub.Channel
 		var response WsJsonResponse
 
 		switch e.Action {
 		case "username":
-			// Handle username assignment
-			clients[e.Conn] = e.Username
+			hub.Clients[e.Conn] = e.Username
 			response.Action = "list_users"
 			response.ConnectedUsers = getUserList()
 			broadcastToAll(response)
 
 		case "left":
-			// Handle client disconnection
 			response.Action = "list_users"
-			delete(clients, e.Conn)
+			delete(hub.Clients, e.Conn)
 			response.ConnectedUsers = getUserList()
 			broadcastToAll(response)
 
 		case "broadcast":
-			// Handle broadcast messages
 			response.Action = "broadcast"
 			response.Message = fmt.Sprintf("<strong>%s</strong>: %s", e.Username, e.Message)
-			response.TimeStamp = time.Now().Format("15:07") // added timestamp for broadcasting message
+			response.TimeStamp = time.Now().Format("15:07")
 			broadcastToAll(response)
 
 		case "private":
-			// handle private messages
 			handlePrivateMessage(e)
 		}
 	}
 }
 
-//function handlePrivateMessage sends a message to a specific user
-
+// handlePrivateMessage sends a message to a specific user
 func handlePrivateMessage(payload WsPayload) {
-
-	// finding the recipient connection
 	var recipientConn *websocket.Conn
-	for conn, username := range clients {
+	for conn, username := range hub.Clients {
 		if username == payload.To {
 			recipientConn = conn
 			break
 		}
 	}
-
-	// if recipient not found , then send an error message to sender
-	// timestamp for sending error messages as well
 
 	if recipientConn == nil {
 		errorResponse := WsJsonResponse{
@@ -153,18 +152,14 @@ func handlePrivateMessage(payload WsPayload) {
 		return
 	}
 
-	// creating a private message response
-
 	response := WsJsonResponse{
 		Action:      "private",
 		Message:     payload.Message,
 		MessageType: "private",
 		From:        payload.Username,
 		To:          payload.To,
-		TimeStamp:   time.Now().Format("15:07"), // timestamp for private message as well
+		TimeStamp:   time.Now().Format("15:07"),
 	}
-
-	// this is send to recipient
 
 	if err := recipientConn.WriteJSON(response); err != nil {
 		log.Printf("Error sending private message to recipient: %v", err)
@@ -172,17 +167,16 @@ func handlePrivateMessage(payload WsPayload) {
 		log.Printf("Private message sent from %s to %s", payload.Username, payload.To)
 	}
 
-	// echo back to the sender (for confirmation on the Ui side)
-
 	if err := payload.Conn.WriteJSON(response); err != nil {
 		log.Printf("Error sending confirmation to sender: %v", err)
 	}
 }
 
 // getUserList returns a sorted list of connected usernames
+
 func getUserList() []string {
 	var userList []string
-	for _, username := range clients {
+	for _, username := range hub.Clients {
 		if username != "" {
 			userList = append(userList, username)
 		}
@@ -192,17 +186,19 @@ func getUserList() []string {
 }
 
 // broadcastToAll sends a WebSocket response to all connected clients
+
 func broadcastToAll(response WsJsonResponse) {
-	for client := range clients {
+	for client := range hub.Clients {
 		if err := client.WriteJSON(response); err != nil {
 			log.Printf("Error sending message to client: %v", err)
 			_ = client.Close()
-			delete(clients, client)
+			delete(hub.Clients, client)
 		}
 	}
 }
 
 // ListenForWs listens for messages from a specific WebSocket client
+
 func ListenForWs(conn *websocket.Conn) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -216,14 +212,13 @@ func ListenForWs(conn *websocket.Conn) {
 			log.Println("Error reading WebSocket message:", err)
 			return
 		}
-
-		// Assign connection to payload and send it to the channel
 		payload.Conn = conn
-		wsChannel <- payload
+		hub.Channel <- payload
 	}
 }
 
 // renderPage renders a template with the given data
+
 func renderPage(w http.ResponseWriter, tmpl string, data jet.VarMap) error {
 	view, err := views.GetTemplate(tmpl)
 	if err != nil {
