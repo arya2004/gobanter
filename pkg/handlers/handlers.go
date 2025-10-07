@@ -236,16 +236,33 @@ func broadcastToAll(response WsJsonResponse) {
 func ListenForWs(conn *websocket.Conn) {
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Info("Recovered from error: %v", r)
+			slog.Error("Recovered from panic in ListenForWs", "error", r)
 		}
 	}()
 
 	var payload WsPayload
 	for {
 		if err := conn.ReadJSON(&payload); err != nil {
-			slog.Info("Error reading WebSocket message:", err)
-			// optionally notify hub that this conn left:
-			hub.Channel <- WsPayload{Action: "left", Conn: conn}
+			// structured disconnect log with reason and timestamp
+
+			hub.RLock()
+			username := hub.Clients[conn]
+			hub.RUnlock()
+
+			slog.Warn("Client disconnected",
+				"username", username,
+				"reason", err.Error(),
+				"time", time.Now().Format(time.RFC3339),
+			)
+
+			// actively broadcast "left" message(remaining message)
+
+			hub.Channel <- WsPayload{
+				Action:   "left",
+				Conn:     conn,
+				Username: username,
+			}
+
 			return
 		}
 		payload.Conn = conn
