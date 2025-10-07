@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/CloudyKit/jet/v6"
@@ -13,19 +14,18 @@ import (
 
 // Hub encapsulates all WebSocket related global state
 type Hub struct {
-	Clients map[*websocket.Conn]string
-	Channel chan WsPayload
+	sync.RWMutex // protects Clients
+	Clients      map[*websocket.Conn]string
+	Channel      chan WsPayload
 }
 
 // Create a single hub instance
-
 var hub = Hub{
 	Clients: make(map[*websocket.Conn]string),
 	Channel: make(chan WsPayload),
 }
 
 // template engine and WebSocket upgrader
-
 var (
 	views = jet.NewSet(
 		jet.NewOSFileSystemLoader("./templates"),
@@ -39,7 +39,6 @@ var (
 )
 
 // Home renders the home page of the application
-
 func Home(w http.ResponseWriter, r *http.Request) {
 	log.Println("Rendering home page")
 	if err := renderPage(w, "home.html", nil); err != nil {
@@ -69,7 +68,6 @@ type WsPayload struct {
 }
 
 // WsEndpoint upgrades HTTP connections to WebSocket and initializes communication
-
 func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 	log.Println("Client attempting to connect to WebSocket endpoint")
 
@@ -86,7 +84,10 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 		TimeStamp: time.Now().Format("15:07"),
 	}
 
-	hub.Clients[ws] = "" // Add connection to Hub
+	// Add connection to Hub (write lock)
+	hub.Lock()
+	hub.Clients[ws] = ""
+	hub.Unlock()
 
 	if err := ws.WriteJSON(response); err != nil {
 		log.Println("Error writing JSON response:", err)
@@ -97,7 +98,6 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListenToWsChannel listens for messages on the Hub channel
-
 func ListenToWsChannel() {
 	for {
 		e := <-hub.Channel
@@ -105,7 +105,11 @@ func ListenToWsChannel() {
 
 		switch e.Action {
 		case "username":
+			// set username for connection (write lock)
+			hub.Lock()
 			hub.Clients[e.Conn] = e.Username
+			hub.Unlock()
+
 			response.Action = "list_users"
 			response.ConnectedUsers = getUserList()
 			broadcastToAll(response)
@@ -116,8 +120,12 @@ func ListenToWsChannel() {
 			broadcastToAll(response)
 
 		case "left":
-			response.Action = "list_users"
+			// remove connection from hub (write lock)
+			hub.Lock()
 			delete(hub.Clients, e.Conn)
+			hub.Unlock()
+
+			response.Action = "list_users"
 			response.ConnectedUsers = getUserList()
 			broadcastToAll(response)
 
@@ -136,12 +144,16 @@ func ListenToWsChannel() {
 // handlePrivateMessage sends a message to a specific user
 func handlePrivateMessage(payload WsPayload) {
 	var recipientConn *websocket.Conn
+
+	// read-lock to search for the recipient connection
+	hub.RLock()
 	for conn, username := range hub.Clients {
 		if username == payload.To {
 			recipientConn = conn
 			break
 		}
 	}
+	hub.RUnlock()
 
 	if recipientConn == nil {
 		errorResponse := WsJsonResponse{
@@ -178,32 +190,52 @@ func handlePrivateMessage(payload WsPayload) {
 }
 
 // getUserList returns a sorted list of connected usernames
-
 func getUserList() []string {
 	var userList []string
+	hub.RLock()
 	for _, username := range hub.Clients {
 		if username != "" {
 			userList = append(userList, username)
 		}
 	}
+	hub.RUnlock()
 	sort.Strings(userList)
 	return userList
 }
 
 // broadcastToAll sends a WebSocket response to all connected clients
-
 func broadcastToAll(response WsJsonResponse) {
-	for client := range hub.Clients {
+	// take a snapshot of current clients to avoid holding lock while writing
+	hub.RLock()
+	clients := make([]*websocket.Conn, 0, len(hub.Clients))
+	for c := range hub.Clients {
+		clients = append(clients, c)
+	}
+	hub.RUnlock()
+
+	var badClients []*websocket.Conn
+
+	for _, client := range clients {
 		if err := client.WriteJSON(response); err != nil {
 			log.Printf("Error sending message to client: %v", err)
-			_ = client.Close()
-			delete(hub.Clients, client)
+			badClients = append(badClients, client)
 		}
+	}
+
+	// remove bad clients from the hub under a write lock
+	if len(badClients) > 0 {
+		hub.Lock()
+		for _, c := range badClients {
+			if _, exists := hub.Clients[c]; exists {
+				delete(hub.Clients, c)
+			}
+			_ = c.Close()
+		}
+		hub.Unlock()
 	}
 }
 
 // ListenForWs listens for messages from a specific WebSocket client
-
 func ListenForWs(conn *websocket.Conn) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -215,6 +247,8 @@ func ListenForWs(conn *websocket.Conn) {
 	for {
 		if err := conn.ReadJSON(&payload); err != nil {
 			log.Println("Error reading WebSocket message:", err)
+			// optionally notify hub that this conn left:
+			hub.Channel <- WsPayload{Action: "left", Conn: conn}
 			return
 		}
 		payload.Conn = conn
@@ -223,7 +257,6 @@ func ListenForWs(conn *websocket.Conn) {
 }
 
 // renderPage renders a template with the given data
-
 func renderPage(w http.ResponseWriter, tmpl string, data jet.VarMap) error {
 	view, err := views.GetTemplate(tmpl)
 	if err != nil {
