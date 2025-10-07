@@ -1,4 +1,16 @@
 let socket = null;
+let typingTimer;
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
 
 $(document).ready(function () {
     const offline = `<span class="badge bg-danger">Not connected</span>`;
@@ -40,10 +52,14 @@ $(document).ready(function () {
                 $onlineUsers.empty();
                 if (data.connected_users.length > 0) {
                     $.each(data.connected_users, function (index, user) {
-                        $onlineUsers.append(`<li class="list-group-item">${user}</li>`);
+                        $onlineUsers.append(`<li class="list-group-item">${escapeHtml(user)}</li>`);
                     });
                 }
                 updateRecipientList(data.connected_users);
+                break;
+
+            case "typing":
+                showTypingIndicator(data.from);
                 break;
 
             case "broadcast":
@@ -66,6 +82,15 @@ $(document).ready(function () {
             username: $(this).val(),
         };
         console.log(jsonData);
+        socket.send(JSON.stringify(jsonData));
+    });
+
+    $messageField.on("input", function () {
+        if (typingTimer) clearTimeout(typingTimer);
+        const jsonData = {
+            action: "typing",
+            username: $userField.val(),
+        };
         socket.send(JSON.stringify(jsonData));
     });
 
@@ -113,9 +138,18 @@ $(document).ready(function () {
 
         $.each(users, function (index, user) {
             if (user !== currentUser) {
-                $recipientSelect.append(`<option value="${user}">${user}</option>`);
+                $recipientSelect.append(`<option value="${escapeHtml(user)}">${escapeHtml(user)}</option>`);
             }
         });
+    }
+
+    // Display input indicators
+    function showTypingIndicator(username) {
+        const typingIndicator = `${username} is typing...`;
+        $("#typing-indicator").text(typingIndicator).show();
+        setTimeout(() => {
+            $("#typing-indicator").hide();
+        }, 3000);
     }
 
     //  Clean broadcast message with timestamp
@@ -123,7 +157,7 @@ $(document).ready(function () {
         const time = formatTimestamp(data.timestamp);
         const messageHtml = `
             <div class="public-message mb-2 p-2 border rounded">
-                <strong>${data.username || "Anonymous"}:</strong> ${data.message}
+                <strong>${escapeHtml(data.username || "Anonymous")}:</strong> ${escapeHtml(data.message)}
                 <div class="timestamp text-muted"><small>${time}</small></div>
             </div>
         `;
@@ -141,16 +175,16 @@ $(document).ready(function () {
         if (isReceived) {
             messageHtml = `
                 <div class="private-message mb-2 p-2 border rounded bg-light">
-                    <span class="private-label">Private from <strong>${data.from}</strong>:</span>
-                    <span class="message-text"> ${data.message}</span>
+                    <span class="private-label">Private from <strong>${escapeHtml(data.from)}</strong>:</span>
+                    <span class="message-text"> ${escapeHtml(data.message)}</span>
                     <div class="timestamp text-muted"><small>${time}</small></div>
                 </div>
             `;
         } else {
             messageHtml = `
                 <div class="private-message mb-2 p-2 border rounded bg-light">
-                    <span class="private-label">🔒 Private to <strong>${data.to}</strong>:</span>
-                    <span class="message-text"> ${data.message}</span>
+                    <span class="private-label">🔒 Private to <strong>${escapeHtml(data.to)}</strong>:</span>
+                    <span class="message-text"> ${escapeHtml(data.message)}</span>
                     <div class="timestamp text-muted"><small>${time}</small></div>
                 </div>
             `;
@@ -164,7 +198,7 @@ $(document).ready(function () {
     function displayError(message) {
         const errorHtml = `
             <div class="error-message">
-                <span style="color: #c53030;">❌ ${message}</span>
+                <span style="color: #c53030;">❌ ${escapeHtml(message)}</span>
             </div>
         `;
         $output.append(errorHtml);
