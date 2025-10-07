@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"sort"
 	"sync"
@@ -39,10 +39,13 @@ var (
 )
 
 // Home renders the home page of the application
+
+// using slog package from golang  , for structured logging in the whole codebase , easy to parse (key : value) pairs and easy to applying operations
+
 func Home(w http.ResponseWriter, r *http.Request) {
-	log.Println("Rendering home page")
+	slog.Info("Rendering home page")
 	if err := renderPage(w, "home.html", nil); err != nil {
-		log.Println("Error rendering home page:", err)
+		slog.Info("Error rendering home page:", err)
 	}
 }
 
@@ -68,15 +71,15 @@ type WsPayload struct {
 
 // WsEndpoint upgrades HTTP connections to WebSocket and initializes communication
 func WsEndpoint(w http.ResponseWriter, r *http.Request) {
-	log.Println("Client attempting to connect to WebSocket endpoint")
+	slog.Info("Client attempting to connect to WebSocket endpoint")
 
 	ws, err := upgradeConnection.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("WebSocket upgrade failed:", err)
+		slog.Info("WebSocket upgrade failed:", err)
 		return
 	}
 
-	log.Println("Client successfully connected to WebSocket endpoint")
+	slog.Info("Client successfully connected to WebSocket endpoint")
 
 	response := WsJsonResponse{
 		Message:   "<em><small>Connected to server</small></em>",
@@ -89,7 +92,7 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 	hub.Unlock()
 
 	if err := ws.WriteJSON(response); err != nil {
-		log.Println("Error writing JSON response:", err)
+		slog.Info("Error writing JSON response:", err)
 		return
 	}
 
@@ -158,7 +161,7 @@ func handlePrivateMessage(payload WsPayload) {
 		}
 
 		if err := payload.Conn.WriteJSON(errorResponse); err != nil {
-			log.Printf("Error sending error message to sender: %v", err)
+			slog.Info("Error sending error message to sender: %v", err)
 		}
 		return
 	}
@@ -173,13 +176,13 @@ func handlePrivateMessage(payload WsPayload) {
 	}
 
 	if err := recipientConn.WriteJSON(response); err != nil {
-		log.Printf("Error sending private message to recipient: %v", err)
+		slog.Info("Error sending private message to recipient: %v", err)
 	} else {
-		log.Printf("Private message sent from %s to %s", payload.Username, payload.To)
+		slog.Info("Private message sent from %s to %s", payload.Username, payload.To)
 	}
 
 	if err := payload.Conn.WriteJSON(response); err != nil {
-		log.Printf("Error sending confirmation to sender: %v", err)
+		slog.Info("Error sending confirmation to sender: %v", err)
 	}
 }
 
@@ -211,7 +214,7 @@ func broadcastToAll(response WsJsonResponse) {
 
 	for _, client := range clients {
 		if err := client.WriteJSON(response); err != nil {
-			log.Printf("Error sending message to client: %v", err)
+			slog.Info("Error sending message to client: %v", err)
 			badClients = append(badClients, client)
 		}
 	}
@@ -233,14 +236,14 @@ func broadcastToAll(response WsJsonResponse) {
 func ListenForWs(conn *websocket.Conn) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Recovered from error: %v", r)
+			slog.Info("Recovered from error: %v", r)
 		}
 	}()
 
 	var payload WsPayload
 	for {
 		if err := conn.ReadJSON(&payload); err != nil {
-			log.Println("Error reading WebSocket message:", err)
+			slog.Info("Error reading WebSocket message:", err)
 			// optionally notify hub that this conn left:
 			hub.Channel <- WsPayload{Action: "left", Conn: conn}
 			return
@@ -254,13 +257,14 @@ func ListenForWs(conn *websocket.Conn) {
 func renderPage(w http.ResponseWriter, tmpl string, data jet.VarMap) error {
 	view, err := views.GetTemplate(tmpl)
 	if err != nil {
-		log.Println("Error loading template:", err)
+		slog.Info("Error loading template:", err)
 		return err
 	}
 
 	if err := view.Execute(w, data, nil); err != nil {
-		log.Println("Error executing template:", err)
+		slog.Info("Error executing template:", err)
 		return err
+
 	}
 	return nil
 }
