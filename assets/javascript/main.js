@@ -1,4 +1,5 @@
 let socket = null;
+let typingTimer;
 
 $(document).ready(function () {
     const offline = `<span class="badge bg-danger">Not connected</span>`;
@@ -46,6 +47,10 @@ $(document).ready(function () {
                 updateRecipientList(data.connected_users);
                 break;
 
+            case "typing":
+                showTypingIndicator(data.from);
+                break;
+
             case "broadcast":
                 displayBroadcastMessage(data);
                 break;
@@ -66,6 +71,15 @@ $(document).ready(function () {
             username: $(this).val(),
         };
         console.log(jsonData);
+        socket.send(JSON.stringify(jsonData));
+    });
+
+    $messageField.on("input", function () {
+        if (typingTimer) clearTimeout(typingTimer);
+        const jsonData = {
+            action: "typing",
+            username: $userField.val(),
+        };
         socket.send(JSON.stringify(jsonData));
     });
 
@@ -116,6 +130,15 @@ $(document).ready(function () {
                 $recipientSelect.append(`<option value="${user}">${user}</option>`);
             }
         });
+    }
+
+    // Display input indicators
+    function showTypingIndicator(username) {
+        const typingIndicator = `${username} is typing...`;
+        $("#typing-indicator").text(typingIndicator).show();
+        setTimeout(() => {
+            $("#typing-indicator").hide();
+        }, 3000);
     }
 
     //  Clean broadcast message with timestamp

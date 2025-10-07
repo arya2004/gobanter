@@ -110,6 +110,11 @@ func ListenToWsChannel() {
 			response.ConnectedUsers = getUserList()
 			broadcastToAll(response)
 
+		case "typing":
+			response.Action = "typing"
+			response.From = e.Username
+			broadcastToAll(response)
+
 		case "left":
 			response.Action = "list_users"
 			delete(hub.Clients, e.Conn)
