@@ -25,6 +25,11 @@
     border-radius: 0.5rem;
 }
 
+#typing-indicator {
+    font-style: italic;
+    margin-top: 5px;
+}
+
 .private-message {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-left: 4px solid #5a67d8;

@@ -5,12 +5,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
+	"github.com/arya2004/gobanter/pkg/config"
 	"github.com/arya2004/gobanter/pkg/handlers"
 	"github.com/arya2004/gobanter/pkg/routes"
 )
@@ -21,6 +23,9 @@ func main() {
 
 	// initialize the application routes
 
+	cfg := config.Load()
+
+	// Initialize the application routes
 	mux := routes.Routes()
 
 	//start a goroutine to listen for websocket messages
@@ -65,5 +70,10 @@ func main() {
 		log.Printf("Graceful shutdown failed: %v", err)
 	} else {
 		log.Println("Server shut down cleanly")
+	// Start the HTTP server
+	addr := fmt.Sprintf(":%s", cfg.Port)
+	log.Printf("Server starting on port %s...", cfg.Port)
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		log.Fatalf("Error starting server: %v", err)
 	}
 }

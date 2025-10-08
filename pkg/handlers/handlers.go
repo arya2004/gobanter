@@ -46,6 +46,8 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Rendering home page")
 	if err := renderPage(w, "home.html", nil); err != nil {
 		slog.Info("Error rendering home page:", err)
+		log.Println("Error rendering home page:", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
 
@@ -114,6 +116,11 @@ func ListenToWsChannel() {
 
 			response.Action = "list_users"
 			response.ConnectedUsers = getUserList()
+			broadcastToAll(response)
+
+		case "typing":
+			response.Action = "typing"
+			response.From = e.Username
 			broadcastToAll(response)
 
 		case "left":
